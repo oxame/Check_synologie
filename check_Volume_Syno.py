@@ -1,9 +1,8 @@
 #!/usr/bin/python3.6
 # -*- encoding: utf-8 -*-
 
-import getopt, sys
-import subprocess, re
-
+import getopt, sys,subprocess, re
+from datetime import timedelta
 
 # SNMP community string
 community_string = 'SNMPRGM'
@@ -19,6 +18,14 @@ oid_hrStorageUsed = 'HOST-RESOURCES-MIB:hrStorageUsed'
 oid_hrStorageSize = 'HOST-RESOURCES-MIB:hrStorageSize'
 # OID for hrStorageTable
 oid_hrStorageTable = 'HOST-RESOURCES-MIB:hrStorageTable'
+# OID for UPTIME
+oid_hrSystemUptime = 'HOST-RESOURCES-MIB::hrSystemUptime.0'
+# IOD for Disk status
+OID_DiksStatus = 'SNMPRGM 192.168.1.6 .1.3.6.1.4.1.6574.2.1.1.5'
+# IOD for Disk Name
+OID_DiksName = 'SNMPRGM 192.168.1.6 .1.3.6.1.4.1.6574.2.1.1.2'
+
+
 
 # Exit Code
 ExitOK = 0
@@ -34,7 +41,7 @@ def bytes_to_gb(bytes):
 
 
 def snmp_walk(ip, community, oid):
-    cmd = "snmpwalk -v1 -c {} {} {}".format(community, ip, oid)
+    cmd = "snmpwalk -v 2c -c {} {} {}".format(community, ip, oid)
     try:
         output = subprocess.check_output(cmd, shell=True)
         return output.decode()
@@ -87,6 +94,10 @@ def Check_Size(Used,Size,Warning,Critical):
 
     ReturnNagios(Exit,"{0} Gb".format(UsedGB))
 
+def CheckUptime(ip, community,oid_hrSystemUptime):
+        Time = snmp_walk(ip, community,oid_hrSystemUptime).split(" ")
+        print(Time[-1].replace("\n", ""))
+
 def ReturnNagios(Exit,Print):
     # Exit Code
     ExitOK = 0
@@ -112,13 +123,13 @@ def parse_args(argv):
     community = None
     version = None
     volume = None
-    volume_unit = None
     warning = 80
     critical = 90
+    check = None
     try:
-        opts, args = getopt.getopt(argv, "i:c:v:V:u:W:C", ["ip=", "community=", "version=", "volume=", "unit=","warning=","critical="])
+        opts, args = getopt.getopt(argv, "i:c:v:V:W:C:s:", ["ip=", "community=", "version=", "warning=","critical=", "check="])
     except getopt.GetoptError:
-        print("my_script.py -i <ip> -c <community> -v <version> -V <volume> -u <unit>")
+        print("my_script.py -i <ip> -c <community> -v <version> -V <volume> -u <unit> -s <check>")
         sys.exit(2)
     for opt, arg in opts:
         if opt in ("-i", "--ip"):
@@ -129,28 +140,33 @@ def parse_args(argv):
             version = arg
         elif opt in ("-V", "--volume"):
             volume = arg
-        elif opt in ("-u", "--unit"):
-            volume_unit = arg
         elif opt in ("-W", "--warning"):
             warning = arg
         elif opt in ("-C", "--critical"):
-            critical = arg                  
+            critical = arg 
+        elif opt in ("-s", "--check"):
+            check = arg                  
     if not (ip and community and version):
-            print("my_script.py -i <ip> -c <community> -v <version> [-V <volume>] [-u <unit>] [-W <warning>] [-C <critical>]")
+            print("my_script.py -i <ip> -c <community> -v <version> [-V <volume>] [-W <warning>] [-C <critical>] [-s <check>]")
             sys.exit(2)
-    return ip, community, version, volume, volume_unit, warning, critical
-
+    return ip, community, version, volume, warning, critical, check
 
 
 def main():
 
-    ip, community, version, volume, volume_unit, warning, critical = parse_args(sys.argv[1:])
-    Used, Size, Print  = Get_Volume(ip,community, volume,  oid_hrStorageTable, oid_hrStorageSize, oid_hrStorageUsed)
+    ip, community, version, volume, warning, critical, check = parse_args(sys.argv[1:])
 
-    if Used is None:
-        ReturnNagios(3,"{0}".format(Print))
-    else:
-        Check_Size(Used,Size,warning,critical)
+    if check == 'volume':
+        Used, Size, Print  = Get_Volume(ip,community, volume,  oid_hrStorageTable, oid_hrStorageSize, oid_hrStorageUsed)
+
+        if Used is None:
+            ReturnNagios(3,"{0}".format(Print))
+        else:
+            Check_Size(Used,Size,warning,critical)
+    elif check == 'uptime':
+        CheckUptime(ip, community,oid_hrSystemUptime)
+    elif check == 'diskstatus':
+        print('diskstatus')
 
 
 if __name__ == '__main__':
