@@ -4,11 +4,6 @@
 import getopt, sys,subprocess, re
 from datetime import timedelta
 
-# SNMP community string
-community_string = 'SNMPRGM'
-# IP address of Synology
-ip_address = '192.168.1.6'
-
 
 # OID for hrStorageType
 oid_hrStorageType = 'HOST-RESOURCES-MIB:hrStorageType'
