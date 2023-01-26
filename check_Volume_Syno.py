@@ -30,8 +30,8 @@ ExitUNKNOWN = 3
 
 
 # Function to convert bytes to GB
-def bytes_to_gb(bytes):
-    return round(int(bytes) / (1024 ** 3), 2)
+def octet_to_gb(bytes):
+    return round(int(bytes) / (1024 ** 2), 2)
 
 
 
@@ -76,7 +76,7 @@ def Get_Volume(ip,community, volume, oid_hrStorageTable, oid_hrStorageSize, oid_
 
 def Check_Size(Used,Size,Warning,Critical):
     Pourcent = (int(Used) / int(Size)) * 100
-    UsedGB = bytes_to_gb(int(Used))
+    UsedGB = octet_to_gb(int(Used))
 
     if int(Pourcent) < int(Warning):
         Exit = 0
