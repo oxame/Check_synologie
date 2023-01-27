@@ -143,7 +143,15 @@ def CheckSystem(ip, community,OID_SYSTEMSTATUS):
     ReturnNagios(Exit,Print)
 
 def Print_Help():
-    print("Help")
+    print("Utilisation: check_Synology.py -i IP -c community -V volume -W warning -C critical -s check")
+    print("Options:")
+    print("-i, --ip\t\t\tAdresse IP de votre Synology")
+    print("-c, --community\t\tCommunity SNMP de votre Synology")
+    print("-V, --volume\t\tVolume à vérifier")
+    print("-W, --warning\t\tSeuil d'avertissement en pourcentage")
+    print("-C, --critical\t\tSeuil critique en pourcentage")
+    print("-s, --check\t\tType de vérification à effectuer (uptime, diskstatus, systemstatus)")
+    print("Exemple: check_Synology.py -i 192.168.1.10 -c public -V volume1 -W 80 -C 90 -s diskstatus")
 
 
 
@@ -179,7 +187,7 @@ def parse_args(argv):
     try:
         opts, args = getopt.getopt(argv, "i:c:v:V:W:C:s:", ["ip=", "community=", "version=", "warning=","critical=", "check="])
     except getopt.GetoptError:
-        print("my_script.py -i <ip> -c <community> -v <version> -V <volume> -u <unit> -s <check>")
+        print("check_Synology.py -i <ip> -c <community> -v <version> -V <volume> -u <unit> -s <check>")
         sys.exit(2)
     for opt, arg in opts:
         if opt in ("-i", "--ip"):
@@ -199,7 +207,7 @@ def parse_args(argv):
         elif opt in ("-h", "--help"):
             help = True                       
     if not (ip and community and version):
-            print("my_script.py -i <ip> -c <community> -v <version> [-V <volume>] [-W <warning>] [-C <critical>] [-s <check>]")
+            print("check_Synology.py.py -i <ip> -c <community> -v <version> [-V <volume>] [-W <warning>] [-C <critical>] [-s <check>]")
             sys.exit(2)
     return ip, community, version, volume, warning, critical, check
 
