@@ -96,7 +96,7 @@ def Check_Size(Used,Size,Warning,Critical):
     else:
         Exit = 3
 
-    ReturnNagios(Exit,"{0} Gb".format(UsedGB))
+    ReturnNagios(Exit,"{0:.2f} % {1} Gb".format(Pourcent, UsedGB))
 
 def CheckUptime(ip, community,oid_hrSystemUptime):
         Time = snmp_walk(ip, community,oid_hrSystemUptime).split(" ")
@@ -110,12 +110,13 @@ def CheckDiskStatus(ip, community,OID_DiskStatus, OID_DiksName):
     STAT = {'1': 'Normal', '2' : 'Initialized', '3' : 'NotInitialized', '4' : 'SystemPartitionFailed' , '5' : 'Crashed'}
     DiskUnNormal = []
     for DiskStatus in snmp_walk(ip, community,OID_DiskStatus).split('\n'):
-        if DiskStatus.split(" ")[-1] != '1' and DiskStatus.split(" ")[-1] != '' :
-            DiskUnNormal.append(DiskStatus.split(" ")[0].split('.')[-1] + ":" + STAT[DiskStatus.split(" ")[-1]])
-        if DiskStatus.split(" ")[-1] == '2' or DiskStatus.split(" ")[-1] == '3':               
-            Exit = 1
-        elif DiskStatus.split(" ")[-1] == '4' or DiskStatus.split(" ")[-1] == '5':
-            Exit = 2
+        if DiskStatus != '':
+            if int(GetValue(DiskStatus))  != 1:
+                DiskUnNormal.append(DiskStatus.split(" ")[0].split('.')[-1] + ":" + STAT[DiskStatus.split(" ")[-1]])
+            if int(GetValue(DiskStatus)) == 2 or int(GetValue(DiskStatus)) == 3:               
+                Exit = 1
+            elif int(GetValue(DiskStatus)) == 4 or int(GetValue(DiskStatus)) == 5:
+                Exit = 2
 
     # On récupére le nom des disk en erreur
     if len(DiskUnNormal) > 0:
@@ -150,7 +151,7 @@ def Print_Help():
     print("-V, --volume\t\tVolume à vérifier")
     print("-W, --warning\t\tSeuil d'avertissement en pourcentage")
     print("-C, --critical\t\tSeuil critique en pourcentage")
-    print("-s, --check\t\tType de vérification à effectuer (uptime, diskstatus, systemstatus)")
+    print("-s, --check\t\tType de vérification à effectuer (volume, uptime, diskstatus, systemstatus)")
     print("Exemple: check_Synology.py -i 192.168.1.10 -c public -V volume1 -W 80 -C 90 -s diskstatus")
 
 
@@ -209,16 +210,17 @@ def parse_args(argv):
     if not (ip and community and version):
             print("check_Synology.py.py -i <ip> -c <community> -v <version> [-V <volume>] [-W <warning>] [-C <critical>] [-s <check>]")
             sys.exit(2)
+    if check == 'volume' and volume is None:
+        print("check_Synology.py.py -i <ip> -c <community> -v <version> [-V <volume>] [-W <warning>] [-C <critical>] [-s <check>]")
+        sys.exit(2)       
     return ip, community, version, volume, warning, critical, check
 
 
 def main():
 
     ip, community, version, volume, warning, critical, check = parse_args(sys.argv[1:])
-
     if check == 'volume':
         Used, Size, Print  = Get_Volume(ip,community, volume,  oid_hrStorageTable, oid_hrStorageSize, oid_hrStorageUsed)
-
         if Used is None:
             ReturnNagios(3,"{0}".format(Print))
         else:
