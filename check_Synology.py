@@ -19,7 +19,8 @@ oid_hrSystemUptime = 'HOST-RESOURCES-MIB::hrSystemUptime.0'
 OID_DiskStatus = 'SNMPv2-SMI::enterprises.6574.2.1.1.5'
 # IOD for Disk Name
 OID_DiksName = 'SNMPv2-SMI::enterprises.6574.2.1.1.2'
-
+#OID for systéme status
+OID_SYSTEMSTATUS = 'SNMPv2-SMI::enterprises.6574.1'
 
 
 # Exit Code
@@ -33,7 +34,8 @@ ExitUNKNOWN = 3
 def octet_to_gb(bytes):
     return round(int(bytes) / (1024 ** 2), 2)
 
-
+def GetValue(snmpret):
+    return snmpret.split('=')[1].split(':')[-1].replace('"','').replace('\n','')
 
 def snmp_walk(ip, community, oid):
     cmd = "snmpwalk -v 2c -c {} {} {}".format(community, ip, oid)
@@ -43,6 +45,13 @@ def snmp_walk(ip, community, oid):
     except subprocess.CalledProcessError as e:
         return "Error occured: {}".format(e.output.decode())
 
+def snmp_get(ip, community, oid):
+    cmd = "snmpget -v2c -c {} {} {}".format(community, ip, oid)
+    try:
+        output = subprocess.check_output(cmd, shell=True)
+        return output.decode()
+    except subprocess.CalledProcessError as e:
+        return "Error occured: {}".format(e.output.decode())
 
 def Get_Index_hrStorageDescr(snmpwalk,volume):
     index = None
@@ -117,6 +126,26 @@ def CheckDiskStatus(ip, community,OID_DiskStatus, OID_DiksName):
     ReturnNagios(Exit,Print)
 
 
+def CheckSystem(ip, community,OID_SYSTEMSTATUS):
+    SysStat = {'.1': 'partition status','.3' : 'power supplies fail','.4.1' : 'fan fails','.4.2' : 'CPU fan fails'}
+    Exit = 0
+    Print = ''
+    for Oid in SysStat:
+        SystemStatus = snmp_walk(ip, community,OID_SYSTEMSTATUS + Oid )
+        if SystemStatus != '':
+            if int(GetValue(SystemStatus)) > 1:
+                Exit = 2
+                Print = Print + " " + SysStat[Oid]
+
+    if Print == '':
+        Print = "System status good"
+
+    ReturnNagios(Exit,Print)
+
+def Print_Help():
+    print("Help")
+
+
 
 def ReturnNagios(Exit,Print):
     # Exit Code
@@ -146,6 +175,7 @@ def parse_args(argv):
     warning = 80
     critical = 90
     check = None
+    help = False
     try:
         opts, args = getopt.getopt(argv, "i:c:v:V:W:C:s:", ["ip=", "community=", "version=", "warning=","critical=", "check="])
     except getopt.GetoptError:
@@ -165,7 +195,9 @@ def parse_args(argv):
         elif opt in ("-C", "--critical"):
             critical = arg 
         elif opt in ("-s", "--check"):
-            check = arg                  
+            check = arg    
+        elif opt in ("-h", "--help"):
+            help = True                       
     if not (ip and community and version):
             print("my_script.py -i <ip> -c <community> -v <version> [-V <volume>] [-W <warning>] [-C <critical>] [-s <check>]")
             sys.exit(2)
@@ -187,6 +219,10 @@ def main():
         ReturnNagios(0,"{0}".format(CheckUptime(ip, community,oid_hrSystemUptime)))
     elif check == 'diskstatus':
         CheckDiskStatus(ip, community,OID_DiskStatus, OID_DiksName)
+    elif check == 'systemstatus':
+        CheckSystem(ip, community,OID_SYSTEMSTATUS)   
+    elif help:
+         Print_Help()
 
 
 if __name__ == '__main__':
