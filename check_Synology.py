@@ -1,8 +1,27 @@
 #!/usr/bin/python3.6
+# -*- encoding: utf-8 -*-
 
-
-import getopt, sys,subprocess, re, os
+import getopt, sys,subprocess, re
 from datetime import timedelta
+
+
+# OID for hrStorageType
+oid_hrStorageType = 'HOST-RESOURCES-MIB:hrStorageType'
+# OID for hrStorageUsed
+oid_hrStorageUsed = 'HOST-RESOURCES-MIB:hrStorageUsed'
+# OID for hrStorageSize
+oid_hrStorageSize = 'HOST-RESOURCES-MIB:hrStorageSize'
+# OID for hrStorageTable
+oid_hrStorageTable = 'HOST-RESOURCES-MIB:hrStorageTable'
+# OID for UPTIME
+oid_hrSystemUptime = 'HOST-RESOURCES-MIB::hrSystemUptime.0'
+# IOD for Disk status
+OID_DiskStatus = 'SNMPv2-SMI::enterprises.6574.2.1.1.5'
+# IOD for Disk Name
+OID_DiksName = 'SNMPv2-SMI::enterprises.6574.2.1.1.2'
+#OID for systéme status
+OID_SYSTEMSTATUS = 'SNMPv2-SMI::enterprises.6574.1'
+
 
 # Exit Code
 ExitOK = 0
@@ -10,14 +29,6 @@ ExitWarning = 1
 ExitCritical = 2
 ExitUNKNOWN = 3
 
-#OID Description interface
-Desc = "IF-MIB::ifDescr"
-
-#OID Out Octet
-Out = 'IF-MIB::ifOutOctets'
-
-#OID MIB In Octet
-In = 'IF-MIB::ifInOctets'
 
 # Function to convert bytes to GB
 def octet_to_gb(bytes):
@@ -30,21 +41,12 @@ def Pourcentde(Donne,Pourcent):
     return int(Donne) * int(Pourcent) / 100
 
 def snmp_walk(ip, community, oid):
-<<<<<<< HEAD
     cmd = "snmpwalk -v 2c -c {} {} {}".format(community, ip, oid)    
-=======
-    print("snmpwalk")        
-    cmd = "snmpwalk -v 2c -c {} {} {}".format(community, ip, oid)
->>>>>>> 0e59b475fb9ba0f4c373e17cad47954c58fd7a11
     try:
         output = subprocess.check_output(cmd, shell=True)
         return output.decode()
     except subprocess.CalledProcessError as e:
-<<<<<<< HEAD
         ReturnNagios(2,"Error occured: {}".format(e.output.decode()))
-=======
-        ReturnNagios(3,"Error occured: {}".format("Output : {}".format(e.output)))
->>>>>>> 0e59b475fb9ba0f4c373e17cad47954c58fd7a11
 
 def snmp_get(ip, community, oid):
     cmd = "snmpget -v2c -c {} {} {}".format(community, ip, oid)
@@ -52,7 +54,6 @@ def snmp_get(ip, community, oid):
         output = subprocess.check_output(cmd, shell=True)
         return output.decode()
     except subprocess.CalledProcessError as e:
-<<<<<<< HEAD
         ReturnNagios(2,"Error occured: {}".format(e.output.decode()))
 
 def Get_Index_hrStorageDescr(snmpwalk,volume):
@@ -66,20 +67,15 @@ def Get_Index_hrStorageDescr(snmpwalk,volume):
 def Get_hrStorageDescrSize(snmpwalk):
     Size = re.search('\D*\d*\D*:\s(\d*)', snmpwalk)
     return Size.group(1)
-=======
-        ReturnNagios(3,"Error occured: {}".format("Output : {}".format(e.output)))
->>>>>>> 0e59b475fb9ba0f4c373e17cad47954c58fd7a11
-
-def GetValue(snmpret):
-    return snmpret.split('=')[1].split(':')[-1].replace('"','').replace('\n','').replace(' ','')
 
 
-def GetIndex(snmpret):
-    print(snmpret)
-    return snmpret.split('=')[0].split('.')[1].replace(' ','')
+def Get_hrStorageDescUsed(snmpwalk):
+    Used = re.search('\D*\d*\D*:\s(\d*)', snmpwalk)
+    return Used.group(1)
 
 
-<<<<<<< HEAD
+def Get_Volume(ip,community, volume, oid_hrStorageTable, oid_hrStorageSize, oid_hrStorageUsed):
+
     Used = None
     Size = None
     Index = Get_Index_hrStorageDescr(snmp_walk(ip,community,  oid_hrStorageTable), volume)
@@ -109,84 +105,59 @@ def CheckUptime(ip, community,oid_hrSystemUptime):
         Time = snmp_walk(ip, community,oid_hrSystemUptime).split(" ")
         return Time[-1].replace("\n", "")
 
-=======
-def CalculBdPass(NewValue, OldValue):
-    Out = ""
-    for Value in NewValue.keys():
-        Data = "{}: In {} Ko, Out {} Ko".format(NewValue[Value][1], (int(NewValue[Value][2]) - int(OldValue[Value][2])) /1000, (int(NewValue[Value][2]) - int(OldValue[Value][2])) /1000 )
-        if Out == "":
-            Out = "{}".format(Data)
-        else:
-            Out = "{},{}".format(Out,Data)
 
-    return Out
+def CheckDiskStatus(ip, community,OID_DiskStatus, OID_DiksName):
 
-def TestFile(File):
-    return os.path.exists(File)
+    Print = ""
+    Exit = 0
+    STAT = {'1': 'Normal', '2' : 'Initialized', '3' : 'NotInitialized', '4' : 'SystemPartitionFailed' , '5' : 'Crashed'}
+    DiskUnNormal = []
+    for DiskStatus in snmp_walk(ip, community,OID_DiskStatus).split('\n'):
+        if DiskStatus != '':
+            if int(GetValue(DiskStatus))  != 1:
+                DiskUnNormal.append(DiskStatus.split(" ")[0].split('.')[-1] + ":" + STAT[DiskStatus.split(" ")[-1]])
+            if int(GetValue(DiskStatus)) == 2 or int(GetValue(DiskStatus)) == 3:               
+                Exit = 1
+            elif int(GetValue(DiskStatus)) == 4 or int(GetValue(DiskStatus)) == 5:
+                Exit = 2
+
+    # On récupére le nom des disk en erreur
+    if len(DiskUnNormal) > 0:
+        for A in DiskUnNormal:            
+            Diskname = snmp_walk(ip, community,OID_DiksName + '.' + "{0}".format(A.split(':')[0]) )
+            Print = Print +  "{0} {1} ".format(Diskname.split(':')[-1].replace('"','').replace('\n',''), A.split(':')[1])
+
+    ReturnNagios(Exit,Print)
 
 
-def CollectValue(ip,community,Desc,Out,In, NewValue):
-    
-    for Walk in  snmp_walk(ip, community, Desc).split('\n'):
-        if Walk:
-            GetIndex(Walk)
-            NewValue[GetIndex(Walk)] = [GetIndex(Walk), GetValue(Walk), "", ""]
-    for Walk in  snmp_walk(ip, community, Out).split('\n'):
-        if Walk:
-            GetIndex(Walk)
-            NewValue[GetIndex(Walk)] = [NewValue[GetIndex(Walk)][0], NewValue[GetIndex(Walk)][1], GetValue(Walk), ""]
-    for Walk in  snmp_walk(ip, community, In).split('\n'):
-        if Walk:
-            GetIndex(Walk)
-            NewValue[GetIndex(Walk)] = [NewValue[GetIndex(Walk)][0], NewValue[GetIndex(Walk)][1], NewValue[GetIndex(Walk)][2], GetValue(Walk)]
-    return NewValue
+def CheckSystem(ip, community,OID_SYSTEMSTATUS):
+    SysStat = {'.1': 'partition status','.3' : 'power supplies fail','.4.1' : 'fan fails','.4.2' : 'CPU fan fails'}
+    Exit = 0
+    Print = ''
+    for Oid in SysStat:
+        SystemStatus = snmp_walk(ip, community,OID_SYSTEMSTATUS + Oid )
+        if SystemStatus != '':
+            if int(GetValue(SystemStatus)) > 1:
+                Exit = 2
+                Print = Print + " " + SysStat[Oid]
 
-def FileWrite(File,NewValue):
-	try:
-		with open(File, "w") as text_file:
+    if Print == '':
+        Print = "System status good"
 
-			for i in NewValue.keys():
-				text_file.write("{};{};{};{}\n".format(NewValue[i][0],NewValue[i][1],NewValue[i][2],NewValue[i][3]))
-		text_file.close
-	except IOError:
-		ReturnNagios(2,"Error " + File)
-
-def FileRead(File,OldValue):
-	
-	if TestFile(File):	
-		with open(File) as file:
-			for line in file:
-				OldValue[line.split(';')[0]] = [line.split(';')[1],line.split(';')[2],line.split(';')[3]]
-	else:
-		ReturnNagios(3,"Fichier : {} erreur".format(File))
-	return OldValue
-
-def Interface(ip,community,Desc,Out,In):
-
-    File = "/tmp/{}".format(ip)
-    OldValue = {}
-    NewValue = {}
-    if TestFile(File) == False:
-        NewValue = CollectValue(ip,community,Desc,Out,In, NewValue)
-        FileWrite(File,NewValue)
-        ReturnNagios(3,"Fichier : {} erreur".format(File))
-    else:
-        OldValue = FileRead(File,OldValue)
-        NewValue = CollectValue(ip,community,Desc,Out,In, NewValue)
-        FileWrite(File,NewValue)        
-        ReturnNagios(1,CalculBdPass(NewValue, OldValue))
->>>>>>> 0e59b475fb9ba0f4c373e17cad47954c58fd7a11
-
-    
+    ReturnNagios(Exit,Print)
 
 def Print_Help():
-    print("Utilisation: check_livebox.py -i IP -c community -W warning -C critical -s check")
+    print("Utilisation: check_Synology.py -i IP -c community -V volume -W warning -C critical -s check")
     print("Options:")
-    print("-i, --ip		Adresse IP de votre Synology")
-    print("-c, --community	Community SNMP de votre Synology")
-    print("-W, --warning	Seuil d avertissement en pourcentage")
-    print("-C, --critical	Seuil critique en pourcentage")
-    print("Exemple: check_livebox.py -i 192.168.1.10 -c public -W 80 -C 90 ")
+    print("-i, --ip\t\t\tAdresse IP de votre Synology")
+    print("-c, --community\t\tCommunity SNMP de votre Synology")
+    print("-V, --volume\t\tVolume à vérifier")
+    print("-W, --warning\t\tSeuil d'avertissement en pourcentage")
+    print("-C, --critical\t\tSeuil critique en pourcentage")
+    print("-s, --check\t\tType de vérification à effectuer (volume, uptime, diskstatus, systemstatus)")
+    print("Exemple: check_Synology.py -i 192.168.1.10 -c public -V volume1 -W 80 -C 90 -s diskstatus")
+
+
 
 def ReturnNagios(Exit,Print):
     # Exit Code
@@ -212,6 +183,7 @@ def parse_args(argv):
     ip = None
     community = None
     version = None
+    volume = None
     warning = 80
     critical = 90
     check = None
@@ -219,7 +191,7 @@ def parse_args(argv):
     try:
         opts, args = getopt.getopt(argv, "i:c:v:V:W:C:s:", ["ip=", "community=", "version=", "warning=","critical=", "check="])
     except getopt.GetoptError:
-        print("check_livebox.py -i <ip> -c <community> -v <version> -u <unit> -s <check>")
+        print("check_Synology.py -i <ip> -c <community> -v <version> -V <volume> -u <unit> -s <check>")
         sys.exit(2)
     for opt, arg in opts:
         if opt in ("-i", "--ip"):
@@ -228,6 +200,8 @@ def parse_args(argv):
             community = arg
         elif opt in ("-v", "--version"):
             version = arg
+        elif opt in ("-V", "--volume"):
+            volume = arg
         elif opt in ("-W", "--warning"):
             warning = arg
         elif opt in ("-C", "--critical"):
@@ -237,14 +211,16 @@ def parse_args(argv):
         elif opt in ("-h", "--help"):
             help = True                       
     if not (ip and community and version):
-            print("check_livebox.py -i <ip> -c <community> -v <version> [-W <warning>] [-C <critical>] [-s <check>]")
-            sys.exit(2)     
-    return ip, community, version, warning, critical, check
+            print("check_Synology.py.py -i <ip> -c <community> -v <version> [-V <volume>] [-W <warning>] [-C <critical>] [-s <check>]")
+            sys.exit(2)
+    if check == 'volume' and volume is None:
+        print("check_Synology.py.py -i <ip> -c <community> -v <version> [-V <volume>] [-W <warning>] [-C <critical>] [-s <check>]")
+        sys.exit(2)       
+    return ip, community, version, volume, warning, critical, check
 
 
 def main():
 
-<<<<<<< HEAD
     ip, community, version, volume, warning, critical, check = parse_args(sys.argv[1:])
     if check == 'volume':
         Used, Size, Print  = Get_Volume(ip,community, volume,  oid_hrStorageTable, oid_hrStorageSize, oid_hrStorageUsed)
@@ -260,17 +236,6 @@ def main():
         CheckSystem(ip, community,OID_SYSTEMSTATUS)   
     elif help:
          Print_Help()
-=======
-	ip, community, version, warning, critical, check = parse_args(sys.argv[1:])
-
-	if check == 'Interface':
-		Interface(ip,community,Desc,Out,In)
-	elif help:
-		Print_Help()
-	else:
-		Print_Help()
->>>>>>> 0e59b475fb9ba0f4c373e17cad47954c58fd7a11
-
 
 if __name__ == '__main__':
     main()
