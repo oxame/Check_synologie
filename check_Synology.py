@@ -26,14 +26,25 @@ def octet_to_gb(bytes):
 def GetValue(snmpret):
     return snmpret.split('=')[1].split(':')[-1].replace('"','').replace('\n','')
 
+def Pourcentde(Donne,Pourcent):
+    return int(Donne) * int(Pourcent) / 100
+
 def snmp_walk(ip, community, oid):
+<<<<<<< HEAD
+    cmd = "snmpwalk -v 2c -c {} {} {}".format(community, ip, oid)    
+=======
     print("snmpwalk")        
     cmd = "snmpwalk -v 2c -c {} {} {}".format(community, ip, oid)
+>>>>>>> 0e59b475fb9ba0f4c373e17cad47954c58fd7a11
     try:
         output = subprocess.check_output(cmd, shell=True)
         return output.decode()
     except subprocess.CalledProcessError as e:
+<<<<<<< HEAD
+        ReturnNagios(2,"Error occured: {}".format(e.output.decode()))
+=======
         ReturnNagios(3,"Error occured: {}".format("Output : {}".format(e.output)))
+>>>>>>> 0e59b475fb9ba0f4c373e17cad47954c58fd7a11
 
 def snmp_get(ip, community, oid):
     cmd = "snmpget -v2c -c {} {} {}".format(community, ip, oid)
@@ -41,7 +52,23 @@ def snmp_get(ip, community, oid):
         output = subprocess.check_output(cmd, shell=True)
         return output.decode()
     except subprocess.CalledProcessError as e:
+<<<<<<< HEAD
+        ReturnNagios(2,"Error occured: {}".format(e.output.decode()))
+
+def Get_Index_hrStorageDescr(snmpwalk,volume):
+    index = None
+    for S in snmpwalk.split('\n'):
+        if re.search(volume,S):
+            index = re.search('\D*::\D*(\d*)\s\D+',S)
+            return index.group(1)
+    return index
+
+def Get_hrStorageDescrSize(snmpwalk):
+    Size = re.search('\D*\d*\D*:\s(\d*)', snmpwalk)
+    return Size.group(1)
+=======
         ReturnNagios(3,"Error occured: {}".format("Output : {}".format(e.output)))
+>>>>>>> 0e59b475fb9ba0f4c373e17cad47954c58fd7a11
 
 def GetValue(snmpret):
     return snmpret.split('=')[1].split(':')[-1].replace('"','').replace('\n','').replace(' ','')
@@ -52,6 +79,37 @@ def GetIndex(snmpret):
     return snmpret.split('=')[0].split('.')[1].replace(' ','')
 
 
+<<<<<<< HEAD
+    Used = None
+    Size = None
+    Index = Get_Index_hrStorageDescr(snmp_walk(ip,community,  oid_hrStorageTable), volume)
+    if Index is None:
+        return Used,Size, "{0} non trouver".format(volume)
+    else:
+        Size = Get_hrStorageDescrSize(snmp_walk(ip,community,  oid_hrStorageSize + '.' + Index))
+        Used = Get_hrStorageDescUsed(snmp_walk(ip,community,  oid_hrStorageUsed + '.' + Index))
+        return Used, Size, volume
+
+def Check_Size(volume,Used,Size,Warning,Critical):
+    Pourcent = (int(Used) / int(Size)) * 100
+    UsedGB = octet_to_gb(int(Used))
+
+    if int(Pourcent) < int(Warning):
+        Exit = 0
+    elif int(Pourcent) >= int(Warning) and int(Pourcent) < int(Critical):
+        Exit = 1
+    elif int(Pourcent) >= int(Critical):
+        Exit = 2
+    else:
+        Exit = 3
+
+    ReturnNagios(Exit,"{0} Gb|{1}={2};{3};{4};0;{5}".format(UsedGB,volume,UsedGB,Pourcentde(octet_to_gb(int(Size)),Warning),Pourcentde(octet_to_gb(int(Size)),Critical),octet_to_gb(int(Size))))
+
+def CheckUptime(ip, community,oid_hrSystemUptime):
+        Time = snmp_walk(ip, community,oid_hrSystemUptime).split(" ")
+        return Time[-1].replace("\n", "")
+
+=======
 def CalculBdPass(NewValue, OldValue):
     Out = ""
     for Value in NewValue.keys():
@@ -117,6 +175,7 @@ def Interface(ip,community,Desc,Out,In):
         NewValue = CollectValue(ip,community,Desc,Out,In, NewValue)
         FileWrite(File,NewValue)        
         ReturnNagios(1,CalculBdPass(NewValue, OldValue))
+>>>>>>> 0e59b475fb9ba0f4c373e17cad47954c58fd7a11
 
     
 
@@ -137,16 +196,16 @@ def ReturnNagios(Exit,Print):
     ExitUNKNOWN = 3
 
     if Exit == 0:
-        print("OK : {0}".format(Print))
+        print("OK - {0}".format(Print))
         sys.exit(ExitOK)
     elif Exit == 1:
-        print("WARNING : {0}".format(Print))
+        print("WARNING - {0}".format(Print))
         sys.exit(ExitWarning)
     elif Exit == 2:
-        print("CRITICAL : {0}".format(Print))
+        print("CRITICAL - {0}".format(Print))
         sys.exit(ExitCritical)
     elif Exit == 3:
-        print("UNKNOWN : {0}".format(Print))
+        print("UNKNOWN - {0}".format(Print))
         sys.exit(ExitUNKNOWN)
 
 def parse_args(argv):
@@ -185,6 +244,23 @@ def parse_args(argv):
 
 def main():
 
+<<<<<<< HEAD
+    ip, community, version, volume, warning, critical, check = parse_args(sys.argv[1:])
+    if check == 'volume':
+        Used, Size, Print  = Get_Volume(ip,community, volume,  oid_hrStorageTable, oid_hrStorageSize, oid_hrStorageUsed)
+        if Used is None:
+            ReturnNagios(3,"{0}".format(Print))
+        else:
+            Check_Size(volume,Used,Size,warning,critical)
+    elif check == 'uptime':
+        ReturnNagios(0,"{0}".format(CheckUptime(ip, community,oid_hrSystemUptime)))
+    elif check == 'diskstatus':
+        CheckDiskStatus(ip, community,OID_DiskStatus, OID_DiksName)
+    elif check == 'systemstatus':
+        CheckSystem(ip, community,OID_SYSTEMSTATUS)   
+    elif help:
+         Print_Help()
+=======
 	ip, community, version, warning, critical, check = parse_args(sys.argv[1:])
 
 	if check == 'Interface':
@@ -193,6 +269,7 @@ def main():
 		Print_Help()
 	else:
 		Print_Help()
+>>>>>>> 0e59b475fb9ba0f4c373e17cad47954c58fd7a11
 
 
 if __name__ == '__main__':
